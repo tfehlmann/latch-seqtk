@@ -49,21 +49,6 @@ def seqtk_task(  # pylint: disable=too-many-arguments
             latch2local(input_file),
             str(fraction) if fraction else str(num_reads),
         ]
-        if cast(str, output_file.remote_path).endswith(".gz"):
-            cmd.extend(
-                [
-                    "|",
-                    "igzip",
-                ]
-            )
-        cmd.extend(
-            [
-                ">",
-                f"/root/sampled.{basename(cast(str, input_file.remote_path))}",
-            ]
-        )
-        # filter empty strings
-        cmd = [e for e in cmd if e]
     elif command == Command.seq:
         cmd = [
             "seqtk",
@@ -71,28 +56,29 @@ def seqtk_task(  # pylint: disable=too-many-arguments
             *(["-l", str(num_bases)] if num_bases else []),
             latch2local(input_file),
         ]
-        if cast(str, output_file.remote_path).endswith(".gz"):
-            cmd.extend(
-                [
-                    "|",
-                    "igzip",
-                ]
-            )
-        cmd.extend(
-            [
-                ">",
-                f"/root/seq.{basename(cast(str, input_file.remote_path))}",
-            ]
-        )
-        # filter empty strings
-        cmd = [e for e in cmd if e]
     else:
         raise ValueError(f"Unsupported command {command.value}")
+
+    if cast(str, output_file.remote_path).endswith(".gz"):
+        cmd.extend(
+            [
+                "|",
+                "igzip",
+            ]
+        )
+    cmd.extend(
+        [
+            ">",
+            f"/root/{basename(cast(str, input_file.remote_path))}",
+        ]
+    )
+    # filter empty strings
+    cmd = [e for e in cmd if e]
     message(typ="info", data={"title": "Running seqtk", "body": f"Running {' '.join(cmd)}"})
     execute_cmd(cmd, capture_stdout=False)
 
     return LatchFile(
-        path=f"/root/sampled.{basename(cast(str, input_file.remote_path))}",
+        path=f"/root/{basename(cast(str, input_file.remote_path))}",
         remote_path=output_file.remote_path,  # type: ignore
     )
 
