@@ -19,6 +19,7 @@ class Command(Enum):
     """
 
     sample = "sample"  # pylint: disable=invalid-name
+    seq = "seq"  # pylint: disable=invalid-name
 
 
 @small_task
@@ -29,6 +30,7 @@ def seqtk_task(  # pylint: disable=too-many-arguments
     seed: int,
     fraction: Optional[float],
     num_reads: Optional[int],
+    num_bases: Optional[int],
 ) -> Optional[LatchFile]:
     """
     Run seqtk command on input file
@@ -58,6 +60,28 @@ def seqtk_task(  # pylint: disable=too-many-arguments
             [
                 ">",
                 f"/root/sampled.{basename(cast(str, input_file.remote_path))}",
+            ]
+        )
+        # filter empty strings
+        cmd = [e for e in cmd if e]
+    elif command == Command.seq:
+        cmd = [
+            "seqtk",
+            command.value,
+            *(["-l", str(num_bases)] if num_bases else []),
+            latch2local(input_file),
+        ]
+        if cast(str, output_file.remote_path).endswith(".gz"):
+            cmd.extend(
+                [
+                    "|",
+                    "igzip",
+                ]
+            )
+        cmd.extend(
+            [
+                ">",
+                f"/root/seq.{basename(cast(str, input_file.remote_path))}",
             ]
         )
         # filter empty strings
@@ -120,6 +144,7 @@ metadata.parameters["fraction"] = LatchParameter(
     display_name="Fraction",
     description="Fraction of reads to sample. Either specify the fraction or the number of reads."
     " Used in conjunction with sample command.",
+    section_title="sample",
     hidden=False,
 )
 
@@ -136,6 +161,13 @@ metadata.parameters["seed"] = LatchParameter(
     hidden=False,
 )
 
+metadata.parameters["num_bases"] = LatchParameter(
+    display_name="Number of bases",
+    description="Number of bases per line. Used in conjunction with seq command.",
+    section_title="seq",
+    hidden=False,
+)
+
 
 @workflow(metadata=metadata)
 def seqtk(  # pylint: disable=too-many-arguments
@@ -147,6 +179,7 @@ def seqtk(  # pylint: disable=too-many-arguments
     input_file_r2: Optional[LatchFile] = None,
     output_file_r2: Optional[LatchFile] = None,
     seed: int = 42,
+    num_bases: Optional[int] = None,
 ) -> List[Optional[LatchFile]]:
     """
     Run seqtk command on input file(s)
@@ -160,6 +193,7 @@ def seqtk(  # pylint: disable=too-many-arguments
             seed=seed,
             fraction=fraction,
             num_reads=num_reads,
+            num_bases=num_bases,
         ),
         seqtk_task(
             command=command,
@@ -168,6 +202,7 @@ def seqtk(  # pylint: disable=too-many-arguments
             seed=seed,
             fraction=fraction,
             num_reads=num_reads,
+            num_bases=num_bases,
         ),
     ]
 
